@@ -1,0 +1,61 @@
+{
+    "version": "1.0.0",
+    "title": "System is resilient to provider's failures",
+    "description": "Can our consumer survive gracefully a provider's failure?",
+    "tags": [
+        "service",
+        "kubernetes",
+        "spring"
+    ],
+    "secrets": {
+      "aws": {
+          "aws_access_key_id": "$AWS_ACCESS_KEY",
+          "aws_secret_access_key": "$AWS_SECRET_KEY"
+      }
+    },
+    "steady-state-hypothesis": {
+        "title": "Services are all available and healthy",
+        "probes": [{
+                "type": "probe",
+                "name": "all-services-are-healthy",
+                "tolerance": true,
+                "provider": {
+                    "type": "python",
+                    "module": "chaosk8s.probes",
+                    "func": "all_microservices_healthy"
+                }
+            },
+            {
+                "type": "probe",
+                "name": "consumer-service-must-still-respond",
+                "tolerance": 200,
+                "provider": {
+                    "type": "http",
+                    "url": "http://$URL/invokeConsumedService"
+                }
+            }
+        ]
+    },
+    "method": [{
+            "type": "action",
+            "name": "delete_masters",
+            "provider": {
+                "type": "python",
+                "module": "chaosaws.ec2.actions",
+                "func": "stop_instance",
+                "secrets": ["aws"],
+                "arguments": {
+                    "az": "us-west-2"
+                }
+            },
+            "pauses": {
+                "after": 30
+            }
+        },
+        {
+            "type": "probe",
+            "ref": "all-services-are-healthy"
+        }
+    ],
+    "rollbacks": []
+}

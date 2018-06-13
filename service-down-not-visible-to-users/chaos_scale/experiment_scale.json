@@ -1,0 +1,78 @@
+{
+    "version": "1.0.0",
+    "title": "System is resilient to provider's failures",
+    "description": "Can our consumer survive gracefully a provider's failure?",
+    "tags": [
+        "service",
+        "kubernetes",
+        "spring"
+    ],
+    "steady-state-hypothesis": {
+        "title": "Services are all available and healthy",
+        "probes": [
+            {
+                "type": "probe",
+                "name": "all-services-are-healthy",
+                "tolerance": true,
+                "provider": {
+                    "type": "python",
+                    "module": "chaosk8s.probes",
+                    "func": "all_microservices_healthy"
+                }
+            },
+            {
+                "type": "probe",
+                "name": "consumer-service-must-still-respond",
+                "tolerance": 200,
+                "provider": {
+                    "type": "http",
+                    "url": "http://$URL/invokeConsumedService"
+                }
+            }
+        ]
+    },
+    "method": [
+        {
+            "type": "action",
+            "name": "scale-down-provider-service",
+            "provider": {
+                "type": "python",
+                "module": "chaosk8s.actions",
+                "func": "scale_microservice",
+                "arguments": {
+                    "name": "my-provider-app",
+                    "replicas": 0
+                }
+            },
+            "pauses": {
+                "after": 30
+            }
+        },
+        {
+            "type": "probe",
+            "ref": "all-services-are-healthy"
+        }
+    ],
+    "rollbacks": [
+        {
+            "type": "action",
+            "name": "scale-down-provider-service",
+            "provider": {
+                "type": "python",
+                "module": "chaosk8s.actions",
+                "func": "scale_microservice",
+                "arguments": {
+                    "name": "my-provider-app",
+                    "replicas": 3
+                }
+            },
+	    "pauses": {
+	         "after": 30 
+	    }
+        },
+        {
+            "type": "probe",
+            "ref": "all-services-are-healthy"
+        }
+    ]
+}
